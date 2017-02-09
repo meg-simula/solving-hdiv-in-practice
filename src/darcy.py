@@ -78,7 +78,59 @@ def darcy_lu(mesh, tag):
     timer.stop()
 
     return w
+
+def darcy_prec1(W):
+    (u, p) = TrialFunctions(W)
+    (v, q) = TestFunctions(W)
+    prec = (inner(u, v) + div(u)*div(v) + p*q)*dx
+    B = assemble(prec)
+    return B
+
+def darcy_amg(mesh, tag):
+    "Solve mixed H(div) x L^2 formulation using AMG"
     
+    (A, b, w) = darcy(mesh)
+    timer = Timer(tag)
+
+    B = darcy_prec1(w.function_space())
+    solver = PETScKrylovSolver("gmres", "amg")
+    solver.set_operators(A, B)
+    solver.parameters["monitor_convergence"] = True
+    solver.parameters["report"] = True
+    solver.parameters["relative_tolerance"] = 1.e-10
+    num_iter = solver.solve(w.vector(), b)
+    #solve(A, w.vector(), b)
+    print "num_iter = ", num_iter
+    timer.stop()
+
+    (u, p) = w.split(deepcopy=True)
+    plot(u)
+    plot(p)
+    interactive()
+
+    return w
+
+def darcy_ilu(mesh, tag):
+    "Solve mixed H(div) x L^2 formulation using iLU"
+    
+    (A, b, w) = darcy(mesh)
+    timer = Timer(tag)
+    solver = PETScKrylovSolver("gmres", "ilu")
+    solver.set_operator(A)
+    solver.parameters["monitor_convergence"] = True
+    solver.parameters["report"] = True
+    solver.parameters["relative_tolerance"] = 1.e-10
+    num_iter = solver.solve(w.vector(), b)
+    print "num_iter = ", num_iter
+    timer.stop()
+
+    (u, p) = w.split(deepcopy=True)
+    plot(u)
+    plot(p)
+    interactive()
+
+    return w
+
 def time_solve(mesh, algorithm, tag):
 
     solution = algorithm(mesh, tag)
@@ -104,27 +156,27 @@ def time_solves(mesh, algorithm, tag, R=1):
         
 if __name__ == "__main__":
 
-    set_log_level(ERROR)
+    #set_log_level(ERROR)
     
-    n = 8
+    n = 16
     mesh = UnitCubeMesh(n, n, n)
     h = mesh.hmax()
     
     # Number of repetitions to do timings statistics on
     R = 1 
-    tag = "Primal solve: lu"
-    avg_t, std_t = time_solves(mesh, primal_lu, tag, R=R)
-    print "%s took %0.3g (+- %0.3g)" % (tag, avg_t, std_t)
-    print
+    #tag = "Primal solve: lu"
+    #avg_t, std_t = time_solves(mesh, primal_lu, tag, R=R)
+    #print "%s took %0.3g (+- %0.3g)" % (tag, avg_t, std_t)
+    #print
     
-    tag = "Primal solve: amg"
-    avg_t, std_t = time_solves(mesh, primal_amg, tag, R=R)
-    print "%s took %0.3g (+- %0.3g)" % (tag, avg_t, std_t)
-    print
+    #tag = "Primal solve: amg"
+    #avg_t, std_t = time_solves(mesh, primal_amg, tag, R=R)
+    #print "%s took %0.3g (+- %0.3g)" % (tag, avg_t, std_t)
+    #print
 
-    #tag = "Darcy solve: lu"
-    #avg_t, std_t = time_solves(mesh, darcy_lu, tag, R=R)
-    #print "%s took %0.3g (+-) %0.3g" % (tag, avg_t, std_t)
+    tag = "Darcy solve: amg"
+    avg_t, std_t = time_solves(mesh, darcy_amg, tag, R=R)
+    print "%s took %0.3g (+-) %0.3g" % (tag, avg_t, std_t)
 
     #(u, p) = w.split(deepcopy=True)
     #plot(u)
